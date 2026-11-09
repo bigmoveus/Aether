@@ -74,4 +74,9 @@ pub const MASQUE_PINS: &[&[u8]] = &[
     // cloudflareaccess.com — signed by Google Trust Services WE1
     // Returned when SNI=cloudflareaccess.com
     b"\x3f\xbb\x1d\x74\x52\xd3\x2b\x38\x81\xeb\x4b\x5d\x48\x42\x14\x45\xb6\xb9\xd8\xf5\x22\x59\x59\xf0\x33\x53\x2d\x50\x26\x37\xb0\x40",
+    // SRP: Let's Encrypt YE2 (intermediate) — most edges now serve an
+    // LE-issued leaf for SNI=consumer-masque.cloudflareclient.com; the leaf
+    // rotates quarterly, so pins are matched against the whole chain (tls.rs).
+    // YE2 expires 2028-09-02.
+    b"\xb3\xfb\x5d\x00\xe9\x94\xcd\xdf\x2c\xc9\xa4\xee\xa9\xf8\x06\xbc\x57\x27\xe8\x3c\xc0\xe4\x29\x9b\xf9\x56\xf2\xd5\x24\xfe\x53\x76",
 ];

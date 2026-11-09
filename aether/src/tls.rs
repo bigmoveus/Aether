@@ -979,17 +979,41 @@ pub fn install_verification(
     if pin_endpoint && !expected_pins.is_empty() {
         let pins: Vec<Vec<u8>> = expected_pins.iter().map(|p| p.to_vec()).collect();
         builder.set_custom_verify_callback(SslVerifyMode::PEER, move |ssl| {
-            let leaf_cert = ssl.peer_certificate().ok_or_else(|| {
+            // SRP: match any certificate in the presented chain, not just the
+            // leaf — Cloudflare rotates edge leaf certs under Let's Encrypt,
+            // so the stable pin is the YE2 intermediate.
+            let mut presented: Vec<boring::x509::X509> = Vec::new();
+            if let Some(leaf) = ssl.peer_certificate() {
+                presented.push(leaf);
+            }
+            if let Some(chain) = ssl.peer_cert_chain() {
+                presented.extend(chain.iter().map(|x| x.to_owned()));
+            }
+            if presented.is_empty() {
                 log::warn!("tls pin: no peer certificate presented");
-                SslVerifyError::Invalid(boring::ssl::SslAlert::BAD_CERTIFICATE)
-            })?;
-            let hash = spki_sha256(&leaf_cert).ok_or_else(|| {
-                log::warn!("tls pin: failed to compute SPKI hash");
-                SslVerifyError::Invalid(boring::ssl::SslAlert::INTERNAL_ERROR)
-            })?;
-            if pins.iter().any(|pin| pin.as_slice() == hash.as_slice()) {
+                return Err(SslVerifyError::Invalid(boring::ssl::SslAlert::BAD_CERTIFICATE));
+            }
+            let matches = presented.iter().any(|cert| {
+                spki_sha256(cert)
+                    .map(|hash| pins.iter().any(|pin| pin.as_slice() == hash.as_slice()))
+                    .unwrap_or(false)
+            });
+            if matches {
                 Ok(())
             } else {
+                // SRP debug: log the leaf SPKI + names so a mismatch is diagnosable
+                if let Some(leaf) = ssl.peer_certificate() {
+                    if let Some(hash) = spki_sha256(&leaf) {
+                        let subj = leaf.subject_name().entries()
+                            .map(|e| format!("{}={}", e.object().to_string(), String::from_utf8_lossy(e.data().as_slice())))
+                            .collect::<Vec<_>>().join(",");
+                        let iss = leaf.issuer_name().entries()
+                            .map(|e| format!("{}={}", e.object().to_string(), String::from_utf8_lossy(e.data().as_slice())))
+                            .collect::<Vec<_>>().join(",");
+                        log::warn!("tls pin: no match; leaf spki={} subj=[{}] iss=[{}]", hex::encode(hash), subj, iss);
+                    }
+                }
+                log::warn!("tls pin: no chain certificate matched the pins");
                 Err(SslVerifyError::Invalid(
                     boring::ssl::SslAlert::CERTIFICATE_UNKNOWN,
                 ))
