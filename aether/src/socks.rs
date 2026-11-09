@@ -449,11 +449,11 @@ async fn handle_client(mut sock: TcpStream, stack: StackHandle, bind_ip: IpAddr)
             AetherError::Other("the client did not finish the socks5 handshake in time".into())
         })??;
 
-    log::info!("[srp] client cmd={} target={:?}:{}", cmd, target, port);
+    log::debug!("[srp] client cmd={} target={:?}:{}", cmd, target, port);
     match cmd {
         CMD_CONNECT => {
             let r = handle_connect(sock, stack, target.clone(), port).await;
-            log::info!("[srp] connect {:?}:{} -> {:?}", target, port, r.as_ref().map(|_| ()));
+            log::debug!("[srp] connect {:?}:{} -> {:?}", target, port, r.as_ref().map(|_| ()));
             r
         }
         CMD_UDP_ASSOCIATE => handle_udp_associate(sock, stack, bind_ip, target, port).await,
