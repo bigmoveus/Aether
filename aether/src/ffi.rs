@@ -21,6 +21,14 @@ fn runtime() -> Option<&'static tokio::runtime::Runtime> {
     static RUNTIME: OnceLock<Option<tokio::runtime::Runtime>> = OnceLock::new();
     RUNTIME
         .get_or_init(|| {
+            // SRP: the FFI path never reaches run_with(), so the logger would
+            // never be installed. Init it here (once); RUST_LOG applies. Not in
+            // the unit tests, where some install a logger of their own.
+            #[cfg(not(test))]
+            let _ = env_logger::Builder::from_env(
+                env_logger::Env::default().default_filter_or("info,aether=info"),
+            )
+            .try_init();
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
